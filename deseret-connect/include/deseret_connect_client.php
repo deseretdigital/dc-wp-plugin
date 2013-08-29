@@ -9,7 +9,7 @@ class DeseretConnect_Client
         $this->wpdb = $wpdb;
     }
 
-    public function getRequests($url, $api_key, $pending = true, $author_name = true)
+    public function getRequests($url, $api_key, $pending = true, $author_name = true, $post_type = 'post')
     {
         $ch = curl_init();
 
@@ -53,7 +53,7 @@ class DeseretConnect_Client
             }
 
             foreach($request->documents as $doc) {
-                if(($contentId = $this->savePost($doc, $pending, $pushNow, $head, $author_name, $video))) {
+                if(($contentId = $this->savePost($doc, $pending, $pushNow, $head, $author_name, $video, $post_type))) {
                     $contentIds[] = $contentId;
                     $video = null;
                 }
@@ -71,7 +71,7 @@ class DeseretConnect_Client
      * Saves a post from DeseretConnect
      * @param  Object $document
      */
-    public function savePost($document, $pending, $pushNow = false, $head = null, $author_name = true, $video = null)
+    public function savePost($document, $pending, $pushNow = false, $head = null, $author_name = true, $video = null, $post_type = 'post')
     {
 
         // default to the first/last - or use the byline if we have it.
@@ -113,7 +113,7 @@ class DeseretConnect_Client
             $postData['post_status'] = 'publish';
         }
         $postData['post_title'] = $document->title;
-        $postData['post_type'] = 'post';
+        $postData['post_type'] = $post_type;
         $postData['tags_input'] = $this->getTags($document->keywords);
         //if we have an existing post, set the ID and update updated time
         if (($existingId = $this->getExistingPostId('_dc_content_id', $document->contentId)) !== false) {

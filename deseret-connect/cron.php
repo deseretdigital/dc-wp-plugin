@@ -1,6 +1,6 @@
 <?php
 	
-	require_once(dirname(__FILE__) . '/../../../wp-config.php');
+	require_once(dirname(__FILE__) . '/../../../wp-load.php');
 	require_once( dirname(__FILE__) . '/deseret_connect.php' );
 	                                     
 	nocache_headers();
