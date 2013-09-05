@@ -50,6 +50,7 @@ function deseret_connect_actions_handler(){
     $deseret_connect_opts['api_key'] = $_POST['api_key'];
     $deseret_connect_opts['url'] = $_POST['url'];
     $deseret_connect_opts['author_name'] = $_POST['author_name'];
+    $deseret_connect_opts['post_type'] = $_POST['post_type'];
 	  update_option(DESERET_CONNECT_OPTIONS, $deseret_connect_opts);
 	  wp_redirect(admin_url('admin.php?page=deseret_connect-config&updated=true'));   
    }
