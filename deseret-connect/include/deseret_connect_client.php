@@ -128,9 +128,12 @@ class DeseretConnect_Client
             return;
         }
         if($head){
+	/*
+	// maybe this should be moved to be an option that the publisher can select. Disable for now.
             if($head->canonical){
                 $metaFields['syn_canonical'] = $head->canonical;
             }
+	*/ 
             if($head->standout){
                 $metaFields['syn_standout'] = $head->standout;
             }
