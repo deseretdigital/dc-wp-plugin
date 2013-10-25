@@ -210,8 +210,8 @@ class DeseretConnect_Client
         foreach($postIds as $postId) {
             if($gallery->photos){
                 foreach($gallery->photos as $photo) {
-                    $parts = parse_url($photo->url);
-                    $photoPath = preg_replace('/gallery\//', '', $parts['path']);
+                    $parts = pathinfo($photo->url);
+                    $photoPath = $parts['basename'];
                     $wp_upload_dir = wp_upload_dir();
                     $filename = $wp_upload_dir['path'] . $photoPath;
                     if(!file_exists($filename)) {
