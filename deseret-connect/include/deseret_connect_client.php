@@ -9,7 +9,7 @@ class DeseretConnect_Client
         $this->wpdb = $wpdb;
     }
 
-    public function getRequests($url, $api_key, $pending = true, $author_name = true, $post_type = 'post')
+    public function getRequests($url, $api_key, $pending = true, $author_name = true, $post_type = 'post', $include_canonical = false)
     {
         $ch = curl_init();
 
@@ -21,14 +21,11 @@ class DeseretConnect_Client
             ),
         );
 
-
         $data_json = json_encode($data);
         curl_setopt($ch, CURLOPT_URL, $url);
         curl_setopt($ch, CURLOPT_POST, 1);
-        //$fp = fopen('/tmp/deseretconnect.json', 'w');
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
         curl_setopt($ch, CURLOPT_POSTFIELDS, $data_json);
-        //curl_setopt($ch, CURLOPT_FILE, $fp);
         curl_setopt($ch, CURLOPT_HTTPHEADER, array ("Accept: application/json"));
         $result = curl_exec($ch);
         if(!$result){
@@ -52,26 +49,37 @@ class DeseretConnect_Client
             	}
             }
 
-            foreach($request->documents as $doc) {
-                if(($contentId = $this->savePost($doc, $pending, $pushNow, $head, $author_name, $video, $post_type))) {
-                    $contentIds[] = $contentId;
-                    $video = null;
-                }
+            if(count($request->documents) > 0) {
+	            foreach($request->documents as $doc) {
+	                if(($contentId = $this->savePost($doc, $pending, $pushNow, $head, $author_name, $video, $post_type, $include_canonical))) {
+	                    $contentIds[] = $contentId;
+	                    $video = null;
+	                }
+	            }
             }
-            // only save galleries if the doc was saved
-            if($request->galleries && count($contentIds) > 0){
+
+            // save galleries (either attach to post saved above, or create one from a standalone gallery)
+            if($request->galleries) {
                 foreach($request->galleries as $gallery){
-                    $this->saveGallery($gallery, $contentIds);
+                    $this->saveGallery($gallery, $contentIds, $pending);
                 }
             }
         }
     }
 
     /**
-     * Saves a post from DeseretConnect
+     * Saves a DeseretConnect Story (document) as a WP post
      * @param  Object $document
+     * @param boolean $pending
+     * @param boolean $pushNow
+     * @param Object $head
+     * @param boolean $author_name
+     * @param Object $video
+     * @param string $post_type
+     * @param boolean $include_canonical
+     * @return int
      */
-    public function savePost($document, $pending, $pushNow = false, $head = null, $author_name = true, $video = null, $post_type = 'post')
+    public function savePost($document, $pending, $pushNow = false, $head = null, $author_name = true, $video = null, $post_type = 'post', $include_canonical)
     {
 
         // default to the first/last - or use the byline if we have it.
@@ -114,7 +122,7 @@ class DeseretConnect_Client
         }
         $postData['post_title'] = $document->title;
         $postData['post_type'] = $post_type;
-        $postData['tags_input'] = $this->getTags($document->keywords);
+        $postData['tags_input'] = $document->keywords;
         //if we have an existing post, set the ID and update updated time
         if (($existingId = $this->getExistingPostId('_dc_content_id', $document->contentId)) !== false) {
             $postData['ID'] = $existingId;
@@ -128,13 +136,11 @@ class DeseretConnect_Client
             return;
         }
         if($head){
-	/*
-	// maybe this should be moved to be an option that the publisher can select. Disable for now.
-            if($head->canonical){
+
+            if($head->canonical && $include_canonical){
                 $metaFields['syn_canonical'] = $head->canonical;
             }
-	*/ 
-            if($head->standout){
+            if($head->standout && $include_canonical){
                 $metaFields['syn_standout'] = $head->standout;
             }
             if($head->syndication_source){
@@ -152,7 +158,6 @@ class DeseretConnect_Client
             }
 
         }
-        $unique = true;
         foreach($metaFields as $key => $value){
             add_post_meta($postId, $metaPrefix . $key, $value, true);
         }
@@ -160,6 +165,11 @@ class DeseretConnect_Client
         return $postId;
     }
 
+    /**
+     *
+     * @param string $category
+     * @return int
+     */
     public function getCategory($category)
     {
         $categoryId = '';
@@ -170,11 +180,12 @@ class DeseretConnect_Client
         return $categoryId;
     }
 
-    public function getTags($keywords)
-    {
-        return $keywords;
-    }
-
+    /**
+     * Find an existing post
+     * @param string $field
+     * @param int $value
+     * @return Ambigous <boolean, unknown>
+     */
     public function getExistingPostId($field, $value)
     {
         $postId = false;
@@ -192,6 +203,11 @@ class DeseretConnect_Client
         return $postId;
     }
 
+    /**
+     * Turn document data into a body string
+     * @param unknown $document
+     * @return string
+     */
     public function getContentBody($document)
     {
         $body = $document->body;
@@ -208,11 +224,20 @@ class DeseretConnect_Client
         return $body;
     }
 
-    public function saveGallery($gallery, $postIds)
+    /**
+     * Save a photo gallery
+     * @param unknown $gallery
+     * @param array $postIds
+     * @param boolean $pending
+     */
+    public function saveGallery($gallery, $postIds, $pending=true)
     {
-        foreach($postIds as $postId) {
+    	$postId = array_pop($postIds);
+
             if($gallery->photos){
                 foreach($gallery->photos as $photo) {
+
+                	// write the remote photo to a file
                     $parts = pathinfo($photo->url);
                     $photoPath = $parts['basename'];
                     $wp_upload_dir = wp_upload_dir();
@@ -227,6 +252,7 @@ class DeseretConnect_Client
                         fclose($handle);
                     }
 
+                    // prep attachment data
                     $wp_filetype = wp_check_filetype(basename($filename), null );
                     $attachment = array(
                        'guid' => $wp_upload_dir['baseurl'] . _wp_relative_upload_path( $filename ),
@@ -236,10 +262,50 @@ class DeseretConnect_Client
                        'post_content' => '',
                        'post_status' => 'inherit'
                     );
+
+
                     if (($existingId = $this->getExistingPostId('_dc_photo_id', $photo->id)) !== false) {
                         $attachment['ID'] = $existingId;
                     }
+
+                    // create a post, we weren't given one
+                    if(!$postId > 0) {
+
+                    	$metaPrefix = '_dc_';
+                    	$metaFields = array(
+                    			'content_id'   => $gallery->contentId,
+                    			'request_id'   => $gallery->requestId,
+                    			'beacon'       => $gallery->beacon,
+                    	);
+
+                    	$postData = array();
+                    	if($gallery->description == '') {
+                    		$gallery->description = $gallery->title;
+                    	}
+                    	$postData['post_content'] = $gallery->description; //The description of the gallery
+                    	$postData['post_date'] = current_time('mysql'); // The time post was made. current_time uses the WP timezone
+                    	$postData['post_date_gmt'] = gmdate('Y-m-d H:i:s'); //The time post was made, in GMT. (maybe?)
+                    	$postData['post_excerpt'] = $gallery->description;
+
+                    	if($pending == true) {
+                    		$postData['post_status'] = 'pending';
+                    	} else {
+                    		$postData['post_status'] = 'publish';
+                    	}
+                    	$postData['post_title'] = $gallery->title;
+                    	$postData['post_type'] = $post_type;
+                    	$postData['tags_input'] = $document->keywords;
+                    	//if we have an existing post, set the ID and update updated time
+                    	if (($existingId = $this->getExistingPostId('_dc_content_id', $gallery->contentId)) !== false) {
+                    		$postData['ID'] = $existingId;
+                    	}
+
+                    	$postId = wp_insert_post($postData, $error);
+
+                    }
+
                     $attach_id = wp_insert_attachment( $attachment, $filename, $postId );
+
                     // you must first include the image.php file
                     // for the function wp_generate_attachment_metadata() to work
                     require_once(ABSPATH . 'wp-admin/includes/image.php');
@@ -257,6 +323,6 @@ class DeseretConnect_Client
                     }
                 }
             }
-        }
+
     }
 }

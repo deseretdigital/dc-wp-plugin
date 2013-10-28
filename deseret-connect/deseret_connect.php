@@ -1,7 +1,7 @@
 <?php
 /**
  * Plugin Name: Deseret Connect
- * Plugin URI: http://wp.deseretconnect.com
+ * Plugin URI: http://github.com/deseretdigital/dc-wp-plugin
  * Description: Consume content from Deseret Connect
  * Version: 1.0.3
  * Author: Deseret Connect / Deseret Digital Media
@@ -13,7 +13,7 @@ define('DESERET_CONNECT_OPTIONS', 'deseret_connect_opts');
 define('DESERET_CONNECT_VERSION', '1.0.3');
 /**/
 /* Set up the plugin. */
-add_action('plugins_loaded', 'deseret_connect_setup');  
+add_action('plugins_loaded', 'deseret_connect_setup');
 //add cron intervals
 add_filter('cron_schedules', 'deseret_connect_intervals');
 //Actions for Cron job
@@ -62,24 +62,24 @@ function deseret_connect_activation()
 	$deseret_connect_opts = get_option(DESERET_CONNECT_OPTIONS);
 	if(!empty($deseret_connect_opts)){
 	   $deseret_connect_opts['version'] = DESERET_CONNECT_VERSION;
-	   update_option(DESERET_CONNECT_OPTIONS, $deseret_connect_opts); 	
+	   update_option(DESERET_CONNECT_OPTIONS, $deseret_connect_opts);
 	}else{
 	   $opts = array(
-		'version' => DESERET_CONNECT_VERSION		
+		'version' => DESERET_CONNECT_VERSION
 	  );
 	  // add the configuration options
-	  add_option(DESERET_CONNECT_OPTIONS, $opts);   	
-	}	
-	
-	
+	  add_option(DESERET_CONNECT_OPTIONS, $opts);
+	}
+
+
 	//test if cron active
 	if (!(wp_next_scheduled('deseret_connect_cron')))
 	wp_schedule_event(time(), 'deseret_connect_intervals', 'deseret_connect_cron');
-	
+
 }
 
 function deseret_connect_deactivation(){
-    wp_clear_scheduled_hook('deseret_connect_cron');	
+    wp_clear_scheduled_hook('deseret_connect_cron');
 }
 
 function deseret_connect_cron_hook(){
@@ -90,27 +90,28 @@ function deseret_connect_cron_hook(){
     $pending = $deseret_connect_opts['pending'];
     $author_name = $deseret_connect_opts['author_name'];
     $post_type = $deseret_connect_opts['post_type'];
+    $include_canonical = $deseret_connect_opts['include_canonical'];
 
     require_once DESERET_CONNECT_INC . 'deseret_connect_client.php';
     $client = new DeseretConnect_Client($wpdb);
-    $requests = $client->getRequests($url, $apiKey, $pending, $author_name, $post_type);	
+    $requests = $client->getRequests($url, $apiKey, $pending, $author_name, $post_type, $include_canonical);
 }
 
 function deseret_connect_unix_cron(){
-  deseret_connect_cron_hook();	
+  deseret_connect_cron_hook();
 }
 
 function deseret_connect_intervals($schedules){
    $intervals['deseret_connect_intervals']=array('interval' => '5', 'display' => 'deseret_connect');
    $schedules=array_merge($intervals,$schedules);
-   return $schedules;	
+   return $schedules;
 }
 
-/* 
- * Set up the deseret_connect plugin and load files at appropriate time. 
+/*
+ * Set up the deseret_connect plugin and load files at appropriate time.
 */
 function deseret_connect_setup(){
-   $deseret_connect_opts = get_option(DESERET_CONNECT_OPTIONS);	
+   $deseret_connect_opts = get_option(DESERET_CONNECT_OPTIONS);
    /* Set constant path for the plugin directory */
    define('DESERET_CONNECT_DIR', plugin_dir_path(__FILE__));
    define('DESERET_CONNECT_ADMIN', DESERET_CONNECT_DIR.'/admin/');
@@ -120,20 +121,20 @@ function deseret_connect_setup(){
    define('DESERET_CONNECT_URL', plugin_dir_url(__FILE__));
    define('DESERET_CONNECT_CSS', DESERET_CONNECT_URL.'css/');
    define('DESERET_CONNECT_JS', DESERET_CONNECT_URL.'js/');
-   
+
    if($deseret_connect_opts['unix_cron'] == 'true'){
        wp_clear_scheduled_hook('deseret_connect_cron');
    }else{
 	   //test if cron active
 	   if (!(wp_next_scheduled('deseret_connect_cron'))){
-	     wp_schedule_event(time(), 'deseret_connect_intervals', 'deseret_connect_cron');   
+	     wp_schedule_event(time(), 'deseret_connect_intervals', 'deseret_connect_cron');
      }
-   }      
+   }
 
    if(is_admin())
       require_once(DESERET_CONNECT_ADMIN.'admin.php');
 
-   
+
    //$cron = wp_get_schedules();
    //error_log( "CRON jobs: " . print_r( $cron, true ) );
 }
