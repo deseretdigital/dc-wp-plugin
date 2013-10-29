@@ -19,6 +19,7 @@ Options
 
 Changelog
 ============
+~Current Version:1.0.4~
 
 ### 1.0.4
 * Added new config option to toggle the output of canonical tags in the head of the page
