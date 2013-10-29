@@ -279,13 +279,13 @@ class DeseretConnect_Client
                     	);
 
                     	$postData = array();
-                    	if($gallery->description == '') {
-                    		$gallery->description = $gallery->title;
+                    	if($gallery->body == '') {
+                    		$gallery->body = $gallery->title;
                     	}
-                    	$postData['post_content'] = $gallery->description; //The description of the gallery
+                    	$postData['post_content'] = $gallery->body; //The description of the gallery
                     	$postData['post_date'] = current_time('mysql'); // The time post was made. current_time uses the WP timezone
                     	$postData['post_date_gmt'] = gmdate('Y-m-d H:i:s'); //The time post was made, in GMT. (maybe?)
-                    	$postData['post_excerpt'] = $gallery->description;
+                    	$postData['post_excerpt'] = substr($gallery->body, 0, 250);
 
                     	if($pending == true) {
                     		$postData['post_status'] = 'pending';
