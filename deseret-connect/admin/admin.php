@@ -5,7 +5,9 @@
 require_once('pages.php');
 require_once('meta_box.php');
 /* Initialize the theme admin functions */
-add_action('init', 'deseret_connect_admin_init');
+if( current_user_can( 'manage_options' )) {
+	add_action('init', 'deseret_connect_admin_init');
+}
 
 function deseret_connect_admin_init(){
 
