@@ -4,7 +4,6 @@ function deseret_connect_meta_boxen(){
    $pending = $deseret_connect_opts['pending'];
    $author_name = $deseret_connect_opts['author_name'];
    $api_key = $deseret_connect_opts['api_key'];
-   $url = $deseret_connect_opts['url'];
    $post_type = $deseret_connect_opts['post_type'];
    $include_canonical = $deseret_connect_opts['include_canonical'];
 
@@ -17,7 +16,6 @@ function deseret_connect_meta_boxen(){
    <p><input type="checkbox" value="true" name="include_canonical" <?php if($include_canonical == 'true'){echo 'checked="checked"'; }?> />
    <label>Include canonical tags in the head of the page?</label></p>
   <p><label>API Key</label><br /><input type="text" name="api_key" class="api_key" value="<?php echo $api_key; ?>" /> </p>
-  <p><label>URL </label><br /><input type="text" name="url" class="url" value="<?php echo $url; ?>" /></p>
   <p><label>Post Type</label><br /><select name="post_type">
   	<?php
   		foreach($types as $type) {

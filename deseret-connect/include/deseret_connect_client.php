@@ -241,9 +241,9 @@ class DeseretConnect_Client
                     $parts = pathinfo($photo->url);
                     $photoPath = $parts['basename'];
                     $wp_upload_dir = wp_upload_dir();
-                    $filename = $wp_upload_dir['path'] . $photoPath;
-                    if(!file_exists($filename)) {
-                        $handle = fopen($filename, 'w');
+                    $file = $wp_upload_dir['path'] . $photoPath;
+                    if(!file_exists($file)) {
+                        $handle = fopen($file, 'w');
                         $ch = curl_init();
                         curl_setopt($ch, CURLOPT_URL, $photo->url);
                         curl_setopt($ch, CURLOPT_FILE, $handle);
@@ -252,10 +252,19 @@ class DeseretConnect_Client
                         fclose($handle);
                     }
 
+                    // check mime type of new file, delete and continue if it isn't an image
+                    if(function_exists('finfo_file')) {
+                    	$type = trim(finfo_file(finfo_open(FILEINFO_MIME_TYPE), $file));
+                    	if(strpos($type, 'image/') !== 0) {
+                    		unlink($file);
+                    		continue;
+                    	}
+                    }
+
                     // prep attachment data
-                    $wp_filetype = wp_check_filetype(basename($filename), null );
+                    $wp_filetype = wp_check_filetype(basename($file), null );
                     $attachment = array(
-                       'guid' => $wp_upload_dir['baseurl'] . _wp_relative_upload_path( $filename ),
+                       'guid' => $wp_upload_dir['baseurl'] . _wp_relative_upload_path( $file ),
                        'post_mime_type' => $wp_filetype['type'],
                        'post_title' => $photo->caption,
                        'post_excerpt' => $photo->caption . ' (' . $photo->credit . ')',
@@ -304,12 +313,12 @@ class DeseretConnect_Client
 
                     }
 
-                    $attach_id = wp_insert_attachment( $attachment, $filename, $postId );
+                    $attach_id = wp_insert_attachment( $attachment, $file, $postId );
 
                     // you must first include the image.php file
                     // for the function wp_generate_attachment_metadata() to work
                     require_once(ABSPATH . 'wp-admin/includes/image.php');
-                    $attach_data = wp_generate_attachment_metadata( $attach_id, $filename );
+                    $attach_data = wp_generate_attachment_metadata( $attach_id, $file );
                     wp_update_attachment_metadata( $attach_id, $attach_data );
 
                     $metaPrefix = '_dc_';

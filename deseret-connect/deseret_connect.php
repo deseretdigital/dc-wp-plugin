@@ -85,7 +85,7 @@ function deseret_connect_deactivation(){
 function deseret_connect_cron_hook(){
     global $wpdb;
     $deseret_connect_opts = get_option(DESERET_CONNECT_OPTIONS);
-    $url = $deseret_connect_opts['url'];
+    $url = 'https://www.deseretconnect.com/service/publisher/';
     $apiKey = $deseret_connect_opts['api_key'];
     $pending = $deseret_connect_opts['pending'];
     $author_name = $deseret_connect_opts['author_name'];
