@@ -3,14 +3,14 @@
  * Plugin Name: Deseret Connect
  * Plugin URI: http://github.com/deseretdigital/dc-wp-plugin
  * Description: Consume content from Deseret Connect
- * Version: 1.0.4
+ * Version: 1.0.5
  * Author: Deseret Connect / Deseret Digital Media
  * Author URI:  http://deseretconnect.com
  *
  * @package deseret_connect
  */
 define('DESERET_CONNECT_OPTIONS', 'deseret_connect_opts');
-define('DESERET_CONNECT_VERSION', '1.0.4');
+define('DESERET_CONNECT_VERSION', '1.0.5');
 /**/
 /* Set up the plugin. */
 add_action('plugins_loaded', 'deseret_connect_setup');

@@ -233,17 +233,27 @@ class DeseretConnect_Client
     public function saveGallery($gallery, $postIds, $pending=true)
     {
     	$postId = array_pop($postIds);
+    	$maxSizeInBytes = 2621440; // (20Mb) just a sanity check. This would be a HUGE jpg to process.
+    	$allowedExtensions = array('jpg','jpeg');
 
             if($gallery->photos){
                 foreach($gallery->photos as $photo) {
 
-                	// write the remote photo to a file
+					// parse out the url
                     $parts = pathinfo($photo->url);
-                    $photoPath = $parts['basename'];
+                    $filename = $parts['basename'];
+
+                    // check extension
+                    if(!empty($parts['extension']) || !in_array($ext, $allowedExtensions)) {
+                    	continue;
+                    }
+
+                    // download file to tmp location if the final doesn't exist
                     $wp_upload_dir = wp_upload_dir();
-                    $file = $wp_upload_dir['path'] . $photoPath;
-                    if(!file_exists($file)) {
-                        $handle = fopen($file, 'w');
+                    $tmpLocation = tempnam(sys_get_temp_dir(), 'DC-Photo');
+                    $finalLocation = $wp_upload_dir['path'] . $filename;
+                    if(!file_exists($finalLocation)) {
+                        $handle = fopen($tmpLocation, 'w');
                         $ch = curl_init();
                         curl_setopt($ch, CURLOPT_URL, $photo->url);
                         curl_setopt($ch, CURLOPT_FILE, $handle);
@@ -252,19 +262,30 @@ class DeseretConnect_Client
                         fclose($handle);
                     }
 
-                    // check mime type of new file, delete and continue if it isn't an image
-                    if(function_exists('finfo_file')) {
-                    	$type = trim(finfo_file(finfo_open(FILEINFO_MIME_TYPE), $file));
-                    	if(strpos($type, 'image/') !== 0) {
-                    		unlink($file);
-                    		continue;
-                    	}
+                    // check max size
+                    if($maxSizeInBytes < filesize($tmpLocation)) {
+                    	unlink($tmpLocation);
+                    	continue;
                     }
 
+                    // can we parse it as an image? Check width and type
+                    $imageInfo = getimagesize($tmpLocation, $imageInfo);
+                    if(empty($imageInfo[0]) || $imageInfo[0] < 1) {
+                    	unlink($tmpLocation);
+                    	continue;
+                    }
+                    if(empty($imageInfo['mime']) || strpos($type, 'image/') !== 0) {
+                    	unlink($tmpLocation);
+                    	continue;
+                    }
+
+                    // move the file from tmp
+                    rename($tmpLocation, $finalLocation);
+
                     // prep attachment data
-                    $wp_filetype = wp_check_filetype(basename($file), null );
+                    $wp_filetype = wp_check_filetype(basename($finalLocation), null );
                     $attachment = array(
-                       'guid' => $wp_upload_dir['baseurl'] . _wp_relative_upload_path( $file ),
+                       'guid' => $wp_upload_dir['baseurl'] . _wp_relative_upload_path( $finalLocation ),
                        'post_mime_type' => $wp_filetype['type'],
                        'post_title' => $photo->caption,
                        'post_excerpt' => $photo->caption . ' (' . $photo->credit . ')',
@@ -313,7 +334,8 @@ class DeseretConnect_Client
 
                     }
 
-                    $attach_id = wp_insert_attachment( $attachment, $file, $postId );
+                    // attach the file to the post
+                    $attach_id = wp_insert_attachment( $attachment, $finalLocation, $postId );
 
                     // you must first include the image.php file
                     // for the function wp_generate_attachment_metadata() to work
@@ -326,7 +348,6 @@ class DeseretConnect_Client
                         'photo_id'   => $photo->id,
                     );
 
-                    $unique = true;
                     foreach($metaFields as $key => $value){
                         add_post_meta($attach_id, $metaPrefix . $key, $value, true);
                     }
