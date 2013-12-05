@@ -244,7 +244,7 @@ class DeseretConnect_Client
                     $filename = $parts['basename'];
 
                     // check extension
-                    if(!empty($parts['extension']) || !in_array($ext, $allowedExtensions)) {
+                    if(!empty($parts['extension']) || !in_array($parts['extension'], $allowedExtensions)) {
                     	continue;
                     }
 
@@ -260,27 +260,27 @@ class DeseretConnect_Client
                         $result = curl_exec($ch);
                         curl_close($ch);
                         fclose($handle);
-                    }
 
-                    // check max size
-                    if($maxSizeInBytes < filesize($tmpLocation)) {
-                    	unlink($tmpLocation);
-                    	continue;
-                    }
+                        // check max size
+                        if($maxSizeInBytes < filesize($tmpLocation)) {
+                        	unlink($tmpLocation);
+                        	continue;
+                        }
 
-                    // can we parse it as an image? Check width and type
-                    $imageInfo = getimagesize($tmpLocation, $imageInfo);
-                    if(empty($imageInfo[0]) || $imageInfo[0] < 1) {
-                    	unlink($tmpLocation);
-                    	continue;
-                    }
-                    if(empty($imageInfo['mime']) || strpos($type, 'image/') !== 0) {
-                    	unlink($tmpLocation);
-                    	continue;
-                    }
+                        // can we parse it as an image? Check width and type
+                        $imageInfo = getimagesize($tmpLocation, $imageInfo);
+                        if(empty($imageInfo[0]) || $imageInfo[0] < 1) {
+                        	unlink($tmpLocation);
+                        	continue;
+                        }
+                        if(empty($imageInfo['mime']) || strpos($type, 'image/') !== 0) {
+                        	unlink($tmpLocation);
+                        	continue;
+                        }
 
-                    // move the file from tmp
-                    rename($tmpLocation, $finalLocation);
+                        // move the file from tmp
+                        rename($tmpLocation, $finalLocation);
+                    }
 
                     // prep attachment data
                     $wp_filetype = wp_check_filetype(basename($finalLocation), null );
