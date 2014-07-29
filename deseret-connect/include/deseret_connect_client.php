@@ -247,7 +247,7 @@ class DeseretConnect_Client
     public function saveGallery($gallery, $postIds, $pending=true, $post_type = 'post')
     {
     	$postId = array_pop($postIds);
-    	$maxSizeInBytes = 2621440; // (20Mb) just a sanity check. This would be a HUGE jpg to process.
+    	$maxSizeInBytes = 26214400; // (20Mb) just a sanity check. This would be a HUGE jpg to process.
     	$allowedMimes = array('image/jpeg');
 
             if($gallery->photos){
@@ -298,7 +298,7 @@ class DeseretConnect_Client
 
                         // move the file from tmp
                         rename($tmpLocation, $finalLocation);
-                        chmod($finalLocation, '777');
+                        exec('chmod 777 '.$finalLocation);
                     }
 
                     // prep attachment data
