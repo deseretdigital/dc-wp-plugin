@@ -298,6 +298,7 @@ class DeseretConnect_Client
 
                         // move the file from tmp
                         rename($tmpLocation, $finalLocation);
+                        chmod($finalLocation, '777');
                     }
 
                     // prep attachment data
