@@ -269,7 +269,7 @@ class DeseretConnect_Client
                     // download file to tmp location if the final doesn't exist
                     $wp_upload_dir = wp_upload_dir();
                     $tmpLocation = tempnam(sys_get_temp_dir(), 'DC-Photo');
-                    $finalLocation = $wp_upload_dir['path'] . $photoName;
+                    $finalLocation = $wp_upload_dir['path'] . '/' . $photoName;
                     if(!file_exists($finalLocation)) {
                         $handle = fopen($tmpLocation, 'w');
                         $ch = curl_init();
