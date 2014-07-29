@@ -6,7 +6,7 @@ require_once('pages.php');
 require_once('meta_box.php');
 /* Initialize the theme admin functions */
 if( current_user_can( 'manage_options' )) {
-	add_action('init', 'deseret_connect_admin_init');
+add_action('init', 'deseret_connect_admin_init');
 }
 
 function deseret_connect_admin_init(){
@@ -49,8 +49,8 @@ function deseret_connect_actions_handler(){
    if(isset($_POST['settings'])){
 	  $deseret_connect_opts = get_option(DESERET_CONNECT_OPTIONS);
 	  $deseret_connect_opts['pending'] = $_POST['pending'];
-      $deseret_connect_opts['api_key'] = $_POST['api_key'];
-      $deseret_connect_opts['author_name'] = $_POST['author_name'];
+    $deseret_connect_opts['api_key'] = $_POST['api_key'];
+    $deseret_connect_opts['author_name'] = $_POST['author_name'];
       $deseret_connect_opts['post_type'] = $_POST['post_type'];
       $deseret_connect_opts['include_canonical'] = $_POST['include_canonical'];
 	  update_option(DESERET_CONNECT_OPTIONS, $deseret_connect_opts);

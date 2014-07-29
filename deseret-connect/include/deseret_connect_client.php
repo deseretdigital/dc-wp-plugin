@@ -50,18 +50,21 @@ class DeseretConnect_Client
             }
 
             if(count($request->documents) > 0) {
-	            foreach($request->documents as $doc) {
+            foreach($request->documents as $doc) {
 	                if(($contentId = $this->savePost($doc, $pending, $pushNow, $head, $author_name, $video, $post_type, $include_canonical))) {
-	                    $contentIds[] = $contentId;
-	                    $video = null;
-	                }
-	            }
+                    $contentIds[] = $contentId;
+                    $video = null;
+                }
+            }
             }
 
             // save galleries (either attach to post saved above, or create one from a standalone gallery)
             if($request->galleries) {
                 foreach($request->galleries as $gallery){
-                    $this->saveGallery($gallery, $contentIds, $pending);
+                    if($gallery->type != 'Gallery' && $gallery->type != 'Graphic') {
+                        continue;//no support for audio
+                    }
+                    $this->saveGallery($gallery, $contentIds, $pending, $post_type);
                 }
             }
         }
@@ -83,10 +86,20 @@ class DeseretConnect_Client
     {
 
         // default to the first/last - or use the byline if we have it.
-        $authorName = $document->authors[0]->firstName . " " . $document->authors[0]->lastName;
-        if(!empty($document->authors[0]->byline)) {
-            $authorName = $document->authors[0]->byline;
+        $authors = array();
+        $authorEmails = array();
+        $authorExtra = array();
+        foreach($document->authors as $author) {
+            if(!empty($author->byline)) {
+                $authors []= $author->byline;
+            } else {
+                $authors []= $author->firstName.' '.$author->lastName;
+            }
+            $authorEmails []= $author->publicEmail;
+            $authorExtra []= $author->exraData;
         }
+        $authorName = implode(', ',$authors);
+        $authorEmails = implode(', ',$authorEmails);
 
         $metaPrefix = '_dc_';
         $metaFields = array(
@@ -94,7 +107,8 @@ class DeseretConnect_Client
             'request_id'   => $document->requestId,
             'beacon'       => $document->beacon,
             'author'       => $authorName,
-            'author_email' => $document->authors[0]->publicEmail,
+            'author_email' => $authorEmails,
+            'author_extra_data' => $authorExtra
         );
 
         $postData = array();
@@ -230,28 +244,32 @@ class DeseretConnect_Client
      * @param array $postIds
      * @param boolean $pending
      */
-    public function saveGallery($gallery, $postIds, $pending=true)
+    public function saveGallery($gallery, $postIds, $pending=true, $post_type = 'post')
     {
     	$postId = array_pop($postIds);
     	$maxSizeInBytes = 2621440; // (20Mb) just a sanity check. This would be a HUGE jpg to process.
-    	$allowedExtensions = array('jpg','jpeg');
+    	$allowedMimes = array('image/jpeg');
 
             if($gallery->photos){
                 foreach($gallery->photos as $photo) {
 
 					// parse out the url
-                    $parts = pathinfo($photo->url);
-                    $filename = $parts['basename'];
+                    $parts = explode('/', $photo->url);
+                    $photoName = $parts[count($parts) - 1];
 
                     // check extension
-                    if(!empty($parts['extension']) || !in_array($parts['extension'], $allowedExtensions)) {
+                    $imageInfo = @getimagesize($photo->url);
+                    if(!in_array($imageInfo['mime'], $allowedMimes)) {
                     	continue;
+                    }
+                    if(!strstr($photoName, '.jpg')) {
+                        $photoName .= '.jpg';
                     }
 
                     // download file to tmp location if the final doesn't exist
                     $wp_upload_dir = wp_upload_dir();
                     $tmpLocation = tempnam(sys_get_temp_dir(), 'DC-Photo');
-                    $finalLocation = $wp_upload_dir['path'] . $filename;
+                    $finalLocation = $wp_upload_dir['path'] . $photoName;
                     if(!file_exists($finalLocation)) {
                         $handle = fopen($tmpLocation, 'w');
                         $ch = curl_init();
@@ -265,7 +283,7 @@ class DeseretConnect_Client
                         if($maxSizeInBytes < filesize($tmpLocation)) {
                         	unlink($tmpLocation);
                         	continue;
-                        }
+                    }
 
                         // can we parse it as an image? Check width and type
                         $imageInfo = getimagesize($tmpLocation, $imageInfo);
@@ -273,7 +291,7 @@ class DeseretConnect_Client
                         	unlink($tmpLocation);
                         	continue;
                         }
-                        if(empty($imageInfo['mime']) || strpos($type, 'image/') !== 0) {
+                        if(empty($imageInfo['mime']) || strpos($imageInfo['mime'], 'image/') !== 0) {
                         	unlink($tmpLocation);
                         	continue;
                         }
@@ -324,7 +342,7 @@ class DeseretConnect_Client
                     	}
                     	$postData['post_title'] = $gallery->title;
                     	$postData['post_type'] = $post_type;
-                    	$postData['tags_input'] = $document->keywords;
+                    	$postData['tags_input'] = $gallery->keywords;
                     	//if we have an existing post, set the ID and update updated time
                     	if (($existingId = $this->getExistingPostId('_dc_content_id', $gallery->contentId)) !== false) {
                     		$postData['ID'] = $existingId;
