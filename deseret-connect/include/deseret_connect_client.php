@@ -84,19 +84,35 @@ class DeseretConnect_Client
      */
     public function savePost($document, $pending, $pushNow = false, $head = null, $author_name = true, $video = null, $post_type = 'post', $include_canonical)
     {
-
-        // default to the first/last - or use the byline if we have it.
+        //this mess of author code is mostly because I didn't understand wordpress.  I think it worked one of the half a dozen cleaner ways I did it,
+        // I just didn't know wordpress saved author names and so that is why it was still wrong after all I did.  I'd rather not rewrite it again,
         $authors = array();
         $authorEmails = array();
         $authorExtra = array();
+        $bylineExtra = array();
+        $documentAuthors = array();
         foreach($document->authors as $author) {
-            if(!empty($author->byline)) {
-                $authors []= $author->byline;
-            } else {
-                $authors []= $author->firstName.' '.$author->lastName;
+            $documentAuthors []= (array)$author;
+        }
+        foreach($documentAuthors as $key => $author) {
+            $temp = trim(str_replace(array($author['firstName'], $author['lastName']), '', $author['byline']));
+            if(in_array($temp, $bylineExtra)) {
+                foreach($bylineExtra as $key2 => $value) {
+                    if($value == $temp) {
+                        $documentAuthors[$key2]['byline'] = trim(str_replace($temp, '', $documentAuthors[$key2]['byline']));
+                    }
+                }
             }
-            $authorEmails []= $author->publicEmail;
-            $authorExtra []= $author->exraData;
+            $bylineExtra[$key] = $temp;
+        }
+        foreach($documentAuthors as $key => $author) {
+            if(!empty($author['byline'])) {
+                $authors []= $author['byline'];
+            } else {
+                $authors []= $author['firstName'].' '.$author['lastName'];
+            }
+            $authorEmails []= $author['publicEmail'];
+            $authorExtra []= $author['extraData'];
         }
         $authorName = implode(', ',$authors);
         $authorEmails = implode(', ',$authorEmails);
