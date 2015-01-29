@@ -112,6 +112,16 @@ class DeseretConnect_Client
                 $authors []= $author['firstName'].' '.$author['lastName'];
             }
             $authorEmails []= $author['publicEmail'];
+
+            //lump all our other author data plus our "extra" author data together
+            $tmp = $author;
+            unset($tmp['firstName']);
+            unset($tmp['lastName']);
+            unset($tmp['publicEmail']);
+            unset($tmp['byline']);
+            unset($tmp['extraData']);
+            $author['extraData'] = array_merge($author['extraData'], $tmp);
+
             $authorExtra []= $author['extraData'];
         }
         $authorName = implode(', ',$authors);
