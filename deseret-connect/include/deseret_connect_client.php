@@ -120,7 +120,7 @@ class DeseretConnect_Client
             unset($tmp['publicEmail']);
             unset($tmp['byline']);
             unset($tmp['extraData']);
-            $author['extraData'] = array_merge($author['extraData'], $tmp);
+            $author['extraData'] = array_merge(json_decode(json_encode($author['extraData']), true), $tmp);
 
             $authorExtra []= $author['extraData'];
         }
@@ -177,19 +177,19 @@ class DeseretConnect_Client
         }
         if($head){
 
-            if($head->canonical && $include_canonical){
+            if(isset($head->canonical) && $include_canonical){
                 $metaFields['syn_canonical'] = $head->canonical;
             }
-            if($head->standout && $include_canonical){
+            if(isset($head->standout) && $include_canonical){
                 $metaFields['syn_standout'] = $head->standout;
             }
-            if($head->syndication_source){
+            if(isset($head->syndication_source)){
                 $metaFields['syn_sydication_source'] = $head->syndication_source;
             }
-            if($head->description){
+            if(isset($head->description)){
                 $metaFields['syn_description'] = $head->description;
             }
-            if($head->authors){
+            if(isset($head->authors)){
                 $authorText = '';
                 foreach($head->authors as $author){
                     $authorText .= $author . "\n";
@@ -284,10 +284,6 @@ class DeseretConnect_Client
                     $photoName = $parts[count($parts) - 1];
 
                     // check extension
-                    $imageInfo = @getimagesize($photo->url);
-                    if(!in_array($imageInfo['mime'], $allowedMimes)) {
-                    	continue;
-                    }
                     if(!strstr($photoName, '.jpg')) {
                         $photoName .= '.jpg';
                     }
@@ -317,7 +313,7 @@ class DeseretConnect_Client
                         	unlink($tmpLocation);
                         	continue;
                         }
-                        if(empty($imageInfo['mime']) || strpos($imageInfo['mime'], 'image/') !== 0) {
+                        if(empty($imageInfo['mime']) || strpos($imageInfo['mime'], 'image/') !== 0 || !in_array($imageInfo['mime'], $allowedMimes)) {
                         	unlink($tmpLocation);
                         	continue;
                         }
