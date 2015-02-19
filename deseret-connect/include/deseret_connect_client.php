@@ -326,7 +326,7 @@ class DeseretConnect_Client
                     // prep attachment data
                     $wp_filetype = wp_check_filetype(basename($finalLocation), null );
                     $attachment = array(
-                       'guid' => $wp_upload_dir['baseurl'] . _wp_relative_upload_path( $finalLocation ),
+                       'guid' => $wp_upload_dir['baseurl'] . '/' . _wp_relative_upload_path( $finalLocation ),
                        'post_mime_type' => $wp_filetype['type'],
                        'post_title' => $photo->caption,
                        'post_excerpt' => $photo->caption . ' (' . $photo->credit . ')',
