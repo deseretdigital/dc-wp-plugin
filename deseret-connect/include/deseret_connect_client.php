@@ -381,7 +381,7 @@ class DeseretConnect_Client
                     // you must first include the image.php file
                     // for the function wp_generate_attachment_metadata() to work
                     require_once(ABSPATH . 'wp-admin/includes/image.php');
-                    $attach_data = wp_generate_attachment_metadata( $attach_id, $file );
+                    $attach_data = wp_generate_attachment_metadata( $attach_id, $finalLocation );
                     wp_update_attachment_metadata( $attach_id, $attach_data );
 
                     $metaPrefix = '_dc_';
