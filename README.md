@@ -18,7 +18,11 @@ Options
 
 Changelog
 ============
-~Current Version:1.0.4~
+~Current Version:1.0.5~
+
+### 1.0.5
+* Added support for extra author data
+* Fixed image attachment issues
 
 ### 1.0.4
 * Added new config option to toggle the output of canonical tags in the head of the page
