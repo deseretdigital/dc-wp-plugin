@@ -171,6 +171,7 @@ class DeseretConnect_Client
             }
         }
 
+        kses_remove_filters();
         $postId = wp_insert_post($postData, $error);
         if ($postId == 0) {
             return;
@@ -371,6 +372,7 @@ class DeseretConnect_Client
                     		$postData['ID'] = $existingId;
                     	}
 
+                        kses_remove_filters();
                     	$postId = wp_insert_post($postData, $error);
 
                     }

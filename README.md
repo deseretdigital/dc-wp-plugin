@@ -18,7 +18,10 @@ Options
 
 Changelog
 ============
-~Current Version:1.0.5~
+~Current Version:1.0.6~
+
+### 1.0.6
+* Turned of Kses filtering when posts are inserted so we can insert data attributes
 
 ### 1.0.5
 * Added support for extra author data
