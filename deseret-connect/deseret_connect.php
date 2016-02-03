@@ -85,8 +85,9 @@ function deseret_connect_deactivation(){
 function deseret_connect_cron_hook(){
     global $wpdb;
     $deseret_connect_opts = get_option(DESERET_CONNECT_OPTIONS);
-    $url = 'https://www.deseretconnect.com/service/publisher/';
+    $url = 'https://deseretconnect.dev/service/publisher';
     $apiKey = $deseret_connect_opts['api_key'];
+    $stateId = $deseret_connect_opts['state_id'];
     $pending = $deseret_connect_opts['pending'];
     $author_name = $deseret_connect_opts['author_name'];
     $post_type = $deseret_connect_opts['post_type'];
@@ -94,7 +95,7 @@ function deseret_connect_cron_hook(){
 
     require_once DESERET_CONNECT_INC . 'deseret_connect_client.php';
     $client = new DeseretConnect_Client($wpdb);
-    $requests = $client->getRequests($url, $apiKey, $pending, $author_name, $post_type, $include_canonical);
+    $requests = $client->getRequests($url, $apiKey, $pending, $author_name, $post_type, $include_canonical, $stateId);
 }
 
 function deseret_connect_unix_cron(){

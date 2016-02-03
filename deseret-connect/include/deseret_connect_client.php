@@ -1,26 +1,42 @@
 <?php
-class DeseretConnect_Client
-{
+class DeseretConnect_Client {
 
     protected $wpdb = null;
 
-    public function __construct($wpdb)
-    {
+    public function __construct($wpdb) {
         $this->wpdb = $wpdb;
+        $this->debugFile = fopen('/tmp/wp-debug' . date('YmdHis') . '.txt', 'w');
     }
 
-    public function getRequests($url, $api_key, $pending = true, $author_name = true, $post_type = 'post', $include_canonical = false)
-    {
-        $ch = curl_init();
+    public function __destruct() {
+        fclose($this->debugFile);
+    }
 
+    public function getRequests($url, $api_key, $pending = true, $author_name = true, $post_type = 'post', $include_canonical = false, $state_id = null) {
+        $page = 1;
+        do {
+            $tryNextPage = $this->_getRequests($url, $api_key, $pending, $author_name, $post_type, $include_canonical, $state_id, $page);
+            $page++;
+        } while($tryNextPage);
+        //now that we've got the stories for this state, delete the state id
+        $deseret_connect_opts = get_option(DESERET_CONNECT_OPTIONS);
+        $deseret_connect_opts['state_id'] = '';
+        update_option(DESERET_CONNECT_OPTIONS, $deseret_connect_opts);
+    }
+
+    protected function _getRequests($url, $api_key, $pending, $author_name, $post_type, $include_canonical, $state_id, $page) {
+        $ch = curl_init();
         $data = array(
             'method' => "getRequests",
             "id"     => "1",
             "params" => array(
                 "key" => $api_key,
+                "page" => $page
             ),
         );
-
+        if(!empty($state_id)) {
+            $data['params']['stateId'] = $state_id;
+        }
         $data_json = json_encode($data);
         curl_setopt($ch, CURLOPT_URL, $url);
         curl_setopt($ch, CURLOPT_POST, 1);
@@ -28,14 +44,13 @@ class DeseretConnect_Client
         curl_setopt($ch, CURLOPT_POSTFIELDS, $data_json);
         curl_setopt($ch, CURLOPT_HTTPHEADER, array ("Accept: application/json"));
         $result = curl_exec($ch);
-        if(!$result){
-            return;
-        }
-
         curl_close($ch);
         $result = json_decode($result);
+        if(!$result || empty($result->result)){
+            return false;
+        }
 
-        foreach($result->result as $request){
+        foreach($result->result as $request) {
             $pushNow = $request->pushNow;
             $head = $request->head;
             $contentIds = array();
@@ -68,6 +83,7 @@ class DeseretConnect_Client
                 }
             }
         }
+        return true;
     }
 
     /**
@@ -82,8 +98,7 @@ class DeseretConnect_Client
      * @param boolean $include_canonical
      * @return int
      */
-    public function savePost($document, $pending, $pushNow = false, $head = null, $author_name = true, $video = null, $post_type = 'post', $include_canonical)
-    {
+    public function savePost($document, $pending, $pushNow = false, $head = null, $author_name = true, $video = null, $post_type = 'post', $include_canonical) {
         //this mess of author code is mostly because I didn't understand wordpress.  I think it worked one of the half a dozen cleaner ways I did it,
         // I just didn't know wordpress saved author names and so that is why it was still wrong after all I did.  I'd rather not rewrite it again,
         $authors = array();
@@ -211,11 +226,10 @@ class DeseretConnect_Client
      * @param string $category
      * @return int
      */
-    public function getCategory($category)
-    {
+    public function getCategory($category) {
         $categoryId = '';
         $term = get_term_by('name', $category, 'category');
-        if($term){
+        if($term) {
             $categoryId = $term->term_id;
         }
         return $categoryId;
@@ -227,8 +241,7 @@ class DeseretConnect_Client
      * @param int $value
      * @return Ambigous <boolean, unknown>
      */
-    public function getExistingPostId($field, $value)
-    {
+    public function getExistingPostId($field, $value) {
         $postId = false;
         $res = $this->wpdb->get_col(
           $this->wpdb->prepare(
@@ -249,8 +262,7 @@ class DeseretConnect_Client
      * @param unknown $document
      * @return string
      */
-    public function getContentBody($document)
-    {
+    public function getContentBody($document) {
         $body = $document->body;
         if(isset($document->endNote) && $document->endNote){
             $body .= "\n<i>".$document->endNote."</i>";
@@ -271,8 +283,7 @@ class DeseretConnect_Client
      * @param array $postIds
      * @param boolean $pending
      */
-    public function saveGallery($gallery, $postIds, $pending=true, $post_type = 'post')
-    {
+    public function saveGallery($gallery, $postIds, $pending=true, $post_type = 'post') {
     	$postId = array_pop($postIds);
     	$maxSizeInBytes = 26214400; // (20Mb) just a sanity check. This would be a HUGE jpg to process.
     	$allowedMimes = array('image/jpeg');
@@ -396,6 +407,5 @@ class DeseretConnect_Client
                     }
                 }
             }
-
     }
 }
