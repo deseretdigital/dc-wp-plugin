@@ -18,7 +18,11 @@ Options
 
 Changelog
 ============
-~Current Version:1.0.6~
+~Current Version:1.0.7~
+
+### 1.0.7
+* Added featured image support
+* Added State id support for bulk imports (coordinate with Deseret Connect)
 
 ### 1.0.6
 * Turned of Kses filtering when posts are inserted so we can insert data attributes

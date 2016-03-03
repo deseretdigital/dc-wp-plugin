@@ -12,10 +12,10 @@ class DeseretConnect_Client {
         fclose($this->debugFile);
     }
 
-    public function getRequests($url, $api_key, $pending = true, $author_name = true, $post_type = 'post', $include_canonical = false, $state_id = null) {
+    public function getRequests($url, $api_key, $pending = true, $author_name = true, $post_type = 'post', $include_canonical = false, $state_id = null, $feature_image = false) {
         $page = 1;
         do {
-            $tryNextPage = $this->_getRequests($url, $api_key, $pending, $author_name, $post_type, $include_canonical, $state_id, $page);
+            $tryNextPage = $this->_getRequests($url, $api_key, $pending, $author_name, $post_type, $include_canonical, $state_id, $page, $feature_image);
             $page++;
         } while($tryNextPage);
         //now that we've got the stories for this state, delete the state id
@@ -24,7 +24,7 @@ class DeseretConnect_Client {
         update_option(DESERET_CONNECT_OPTIONS, $deseret_connect_opts);
     }
 
-    protected function _getRequests($url, $api_key, $pending, $author_name, $post_type, $include_canonical, $state_id, $page) {
+    protected function _getRequests($url, $api_key, $pending, $author_name, $post_type, $include_canonical, $state_id, $page, $feature_image) {
         $ch = curl_init();
         $data = array(
             'method' => "getRequests",
@@ -66,7 +66,7 @@ class DeseretConnect_Client {
 
             if(count($request->documents) > 0) {
             foreach($request->documents as $doc) {
-	                if(($contentId = $this->savePost($doc, $pending, $pushNow, $head, $author_name, $video, $post_type, $include_canonical))) {
+	                if(($contentId = $this->savePost($doc, $pending, $pushNow, $head, $author_name, $video, $post_type, $include_canonical, $feature_image))) {
                     $contentIds[] = $contentId;
                     $video = null;
                 }
@@ -79,7 +79,8 @@ class DeseretConnect_Client {
                     if($gallery->type != 'Gallery' && $gallery->type != 'Graphic') {
                         continue;//no support for audio
                     }
-                    $this->saveGallery($gallery, $contentIds, $pending, $post_type);
+                    $this->saveGallery($gallery, $contentIds, $pending, $post_type, $feature_image);
+                    $feature_image = false; // we only want to feature the first image of the first gallery
                 }
             }
         }
@@ -96,9 +97,10 @@ class DeseretConnect_Client {
      * @param Object $video
      * @param string $post_type
      * @param boolean $include_canonical
+     * @param boolean $feature_image
      * @return int
      */
-    public function savePost($document, $pending, $pushNow = false, $head = null, $author_name = true, $video = null, $post_type = 'post', $include_canonical) {
+    public function savePost($document, $pending, $pushNow = false, $head = null, $author_name = true, $video = null, $post_type = 'post', $include_canonical = false, $feature_image = false) {
         //this mess of author code is mostly because I didn't understand wordpress.  I think it worked one of the half a dozen cleaner ways I did it,
         // I just didn't know wordpress saved author names and so that is why it was still wrong after all I did.  I'd rather not rewrite it again,
         $authors = array();
@@ -282,8 +284,10 @@ class DeseretConnect_Client {
      * @param unknown $gallery
      * @param array $postIds
      * @param boolean $pending
+     * @param string $post_type
+     * @param boolean $feature_image
      */
-    public function saveGallery($gallery, $postIds, $pending=true, $post_type = 'post') {
+    public function saveGallery($gallery, $postIds, $pending=true, $post_type = 'post', $feature_image = false) {
     	$postId = array_pop($postIds);
     	$maxSizeInBytes = 26214400; // (20Mb) just a sanity check. This would be a HUGE jpg to process.
     	$allowedMimes = array('image/jpeg');
@@ -405,6 +409,12 @@ class DeseretConnect_Client {
                     foreach($metaFields as $key => $value){
                         add_post_meta($attach_id, $metaPrefix . $key, $value, true);
                     }
+
+                    if($feature_image) {
+                        set_post_thumbnail($postId, $attach_id);
+                    }
+
+                    $feature_image = false;
                 }
             }
     }

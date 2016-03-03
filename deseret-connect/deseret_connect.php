@@ -92,10 +92,11 @@ function deseret_connect_cron_hook(){
     $author_name = $deseret_connect_opts['author_name'];
     $post_type = $deseret_connect_opts['post_type'];
     $include_canonical = $deseret_connect_opts['include_canonical'];
+    $feature_image = $deseret_connect_opts['feature_image'];
 
     require_once DESERET_CONNECT_INC . 'deseret_connect_client.php';
     $client = new DeseretConnect_Client($wpdb);
-    $requests = $client->getRequests($url, $apiKey, $pending, $author_name, $post_type, $include_canonical, $stateId);
+    $requests = $client->getRequests($url, $apiKey, $pending, $author_name, $post_type, $include_canonical, $stateId, $feature_image);
 }
 
 function deseret_connect_unix_cron(){
