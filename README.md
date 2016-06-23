@@ -18,7 +18,10 @@ Options
 
 Changelog
 ============
-~Current Version:1.0.7~
+~Current Version:1.0.8~
+
+### 1.0.8
+* Added logging option for debugging
 
 ### 1.0.7
 * Added featured image support

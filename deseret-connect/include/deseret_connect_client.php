@@ -2,6 +2,8 @@
 class DeseretConnect_Client {
 
     protected $wpdb = null;
+    protected $apiKey;
+    protected $enableLogging;
 
     public function __construct($wpdb) {
         $this->wpdb = $wpdb;
@@ -12,7 +14,9 @@ class DeseretConnect_Client {
         fclose($this->debugFile);
     }
 
-    public function getRequests($url, $api_key, $pending = true, $author_name = true, $post_type = 'post', $include_canonical = false, $state_id = null, $feature_image = false) {
+    public function getRequests($url, $api_key, $pending = true, $author_name = true, $post_type = 'post', $include_canonical = false, $state_id = null, $feature_image = false, $enable_logging = false) {
+        $this->enableLogging = $enable_logging;
+        $this->apiKey = $api_key;
         $page = 1;
         do {
             $tryNextPage = $this->_getRequests($url, $api_key, $pending, $author_name, $post_type, $include_canonical, $state_id, $page, $feature_image);
@@ -25,6 +29,7 @@ class DeseretConnect_Client {
     }
 
     protected function _getRequests($url, $api_key, $pending, $author_name, $post_type, $include_canonical, $state_id, $page, $feature_image) {
+        $this->logToDC('Hitting DC api', func_get_args());
         $ch = curl_init();
         $data = array(
             'method' => "getRequests",
@@ -44,6 +49,7 @@ class DeseretConnect_Client {
         curl_setopt($ch, CURLOPT_POSTFIELDS, $data_json);
         curl_setopt($ch, CURLOPT_HTTPHEADER, array ("Accept: application/json"));
         $result = curl_exec($ch);
+        $this->logToDC('API Result', $result);
         curl_close($ch);
         $result = json_decode($result);
         if(!$result || empty($result->result)){
@@ -67,6 +73,7 @@ class DeseretConnect_Client {
             if(count($request->documents) > 0) {
             foreach($request->documents as $doc) {
 	                if(($contentId = $this->savePost($doc, $pending, $pushNow, $head, $author_name, $video, $post_type, $include_canonical, $feature_image))) {
+                        $this->logToDC('Saved post', array('doc' => $doc, 'contentId' => $contentId));
                     $contentIds[] = $contentId;
                     $video = null;
                 }
@@ -79,6 +86,7 @@ class DeseretConnect_Client {
                     if($gallery->type != 'Gallery' && $gallery->type != 'Graphic') {
                         continue;//no support for audio
                     }
+                    $this->logToDC('Saving gallery', $gallery);
                     $this->saveGallery($gallery, $contentIds, $pending, $post_type, $feature_image);
                     $feature_image = false; // we only want to feature the first image of the first gallery
                 }
@@ -184,6 +192,7 @@ class DeseretConnect_Client {
         if (($existingId = $this->getExistingPostId('_dc_content_id', $document->contentId)) !== false) {
             $postData['ID'] = $existingId;
             if(!$pushNow){
+                $this->logToDC('Saving post - return because of no push now', func_get_args(), 'error');
                 return;
             }
         }
@@ -191,6 +200,7 @@ class DeseretConnect_Client {
         kses_remove_filters();
         $postId = wp_insert_post($postData, $error);
         if ($postId == 0) {
+            $this->logToDC('Saving post - return because of 0 post id', $postData, 'error');
             return;
         }
         if($head){
@@ -292,130 +302,168 @@ class DeseretConnect_Client {
     	$maxSizeInBytes = 26214400; // (20Mb) just a sanity check. This would be a HUGE jpg to process.
     	$allowedMimes = array('image/jpeg');
 
-            if($gallery->photos){
-                foreach($gallery->photos as $photo) {
+        if($gallery->photos){
+            foreach($gallery->photos as $photo) {
 
-					// parse out the url
-                    $parts = explode('/', $photo->url);
-                    $photoName = $parts[count($parts) - 1];
+                // parse out the url
+                $parts = explode('/', $photo->url);
+                $photoName = $parts[count($parts) - 1];
 
-                    // check extension
-                    if(!strstr($photoName, '.jpg')) {
-                        $photoName .= '.jpg';
+                // check extension
+                if(!strstr($photoName, '.jpg')) {
+                    $photoName .= '.jpg';
+                }
+
+                // download file to tmp location if the final doesn't exist
+                $wp_upload_dir = wp_upload_dir();
+                $tmpLocation = tempnam(sys_get_temp_dir(), 'DC-Photo');
+                $finalLocation = $wp_upload_dir['path'] . '/' . $photoName;
+                if(!file_exists($finalLocation)) {
+                    $handle = fopen($tmpLocation, 'w');
+                    $ch = curl_init();
+                    curl_setopt($ch, CURLOPT_URL, $photo->url);
+                    curl_setopt($ch, CURLOPT_FILE, $handle);
+                    $result = curl_exec($ch);
+                    curl_close($ch);
+                    fclose($handle);
+
+                    // check max size
+                    if($maxSizeInBytes < filesize($tmpLocation)) {
+                        unlink($tmpLocation);
+                        $this->logToDC('Saving gallery - photo too large', $photo, 'error');
+                        continue;
+                }
+
+                    // can we parse it as an image? Check width and type
+                    $imageInfo = getimagesize($tmpLocation, $imageInfo);
+                    if(empty($imageInfo[0]) || $imageInfo[0] < 1) {
+                        $this->logToDC('Saving gallery - cant parse image', $photo, 'error');
+                        unlink($tmpLocation);
+                        continue;
+                    }
+                    if(empty($imageInfo['mime']) || strpos($imageInfo['mime'], 'image/') !== 0 || !in_array($imageInfo['mime'], $allowedMimes)) {
+                        $this->logToDC('Saving gallery - not an image', $photo, 'error');
+                        unlink($tmpLocation);
+                        continue;
                     }
 
-                    // download file to tmp location if the final doesn't exist
-                    $wp_upload_dir = wp_upload_dir();
-                    $tmpLocation = tempnam(sys_get_temp_dir(), 'DC-Photo');
-                    $finalLocation = $wp_upload_dir['path'] . '/' . $photoName;
-                    if(!file_exists($finalLocation)) {
-                        $handle = fopen($tmpLocation, 'w');
-                        $ch = curl_init();
-                        curl_setopt($ch, CURLOPT_URL, $photo->url);
-                        curl_setopt($ch, CURLOPT_FILE, $handle);
-                        $result = curl_exec($ch);
-                        curl_close($ch);
-                        fclose($handle);
+                    // move the file from tmp
+                    rename($tmpLocation, $finalLocation);
+                    exec('chmod 777 '.$finalLocation);
+                }
 
-                        // check max size
-                        if($maxSizeInBytes < filesize($tmpLocation)) {
-                        	unlink($tmpLocation);
-                        	continue;
-                    }
-
-                        // can we parse it as an image? Check width and type
-                        $imageInfo = getimagesize($tmpLocation, $imageInfo);
-                        if(empty($imageInfo[0]) || $imageInfo[0] < 1) {
-                        	unlink($tmpLocation);
-                        	continue;
-                        }
-                        if(empty($imageInfo['mime']) || strpos($imageInfo['mime'], 'image/') !== 0 || !in_array($imageInfo['mime'], $allowedMimes)) {
-                        	unlink($tmpLocation);
-                        	continue;
-                        }
-
-                        // move the file from tmp
-                        rename($tmpLocation, $finalLocation);
-                        exec('chmod 777 '.$finalLocation);
-                    }
-
-                    // prep attachment data
-                    $wp_filetype = wp_check_filetype(basename($finalLocation), null );
-                    $attachment = array(
-                       'guid' => $wp_upload_dir['baseurl'] . '/' . _wp_relative_upload_path( $finalLocation ),
-                       'post_mime_type' => $wp_filetype['type'],
-                       'post_title' => $photo->caption,
-                       'post_excerpt' => $photo->caption . ' (' . $photo->credit . ')',
-                       'post_content' => '',
-                       'post_status' => 'inherit'
-                    );
+                // prep attachment data
+                $wp_filetype = wp_check_filetype(basename($finalLocation), null );
+                $attachment = array(
+                   'guid' => $wp_upload_dir['baseurl'] . '/' . _wp_relative_upload_path( $finalLocation ),
+                   'post_mime_type' => $wp_filetype['type'],
+                   'post_title' => $photo->caption,
+                   'post_excerpt' => $photo->caption . ' (' . $photo->credit . ')',
+                   'post_content' => '',
+                   'post_status' => 'inherit'
+                );
 
 
-                    if (($existingId = $this->getExistingPostId('_dc_photo_id', $photo->id)) !== false) {
-                        $attachment['ID'] = $existingId;
-                    }
+                if (($existingId = $this->getExistingPostId('_dc_photo_id', $photo->id)) !== false) {
+                    $attachment['ID'] = $existingId;
+                }
 
-                    // create a post, we weren't given one
-                    if(!$postId > 0) {
-
-                    	$metaPrefix = '_dc_';
-                    	$metaFields = array(
-                    			'content_id'   => $gallery->contentId,
-                    			'request_id'   => $gallery->requestId,
-                    			'beacon'       => $gallery->beacon,
-                    	);
-
-                    	$postData = array();
-                    	if($gallery->body == '') {
-                    		$gallery->body = $gallery->title;
-                    	}
-                    	$postData['post_content'] = $gallery->body; //The description of the gallery
-                    	$postData['post_date'] = current_time('mysql'); // The time post was made. current_time uses the WP timezone
-                    	$postData['post_date_gmt'] = gmdate('Y-m-d H:i:s'); //The time post was made, in GMT. (maybe?)
-                    	$postData['post_excerpt'] = substr($gallery->body, 0, 250);
-
-                    	if($pending == true) {
-                    		$postData['post_status'] = 'pending';
-                    	} else {
-                    		$postData['post_status'] = 'publish';
-                    	}
-                    	$postData['post_title'] = $gallery->title;
-                    	$postData['post_type'] = $post_type;
-                    	$postData['tags_input'] = $gallery->keywords;
-                    	//if we have an existing post, set the ID and update updated time
-                    	if (($existingId = $this->getExistingPostId('_dc_content_id', $gallery->contentId)) !== false) {
-                    		$postData['ID'] = $existingId;
-                    	}
-
-                        kses_remove_filters();
-                    	$postId = wp_insert_post($postData, $error);
-
-                    }
-
-                    // attach the file to the post
-                    $attach_id = wp_insert_attachment( $attachment, $finalLocation, $postId );
-
-                    // you must first include the image.php file
-                    // for the function wp_generate_attachment_metadata() to work
-                    require_once(ABSPATH . 'wp-admin/includes/image.php');
-                    $attach_data = wp_generate_attachment_metadata( $attach_id, $finalLocation );
-                    wp_update_attachment_metadata( $attach_id, $attach_data );
+                // create a post, we weren't given one
+                if(!$postId > 0) {
 
                     $metaPrefix = '_dc_';
                     $metaFields = array(
-                        'photo_id'   => $photo->id,
+                            'content_id'   => $gallery->contentId,
+                            'request_id'   => $gallery->requestId,
+                            'beacon'       => $gallery->beacon,
                     );
 
-                    foreach($metaFields as $key => $value){
-                        add_post_meta($attach_id, $metaPrefix . $key, $value, true);
+                    $postData = array();
+                    if($gallery->body == '') {
+                        $gallery->body = $gallery->title;
+                    }
+                    $postData['post_content'] = $gallery->body; //The description of the gallery
+                    $postData['post_date'] = current_time('mysql'); // The time post was made. current_time uses the WP timezone
+                    $postData['post_date_gmt'] = gmdate('Y-m-d H:i:s'); //The time post was made, in GMT. (maybe?)
+                    $postData['post_excerpt'] = substr($gallery->body, 0, 250);
+
+                    if($pending == true) {
+                        $postData['post_status'] = 'pending';
+                    } else {
+                        $postData['post_status'] = 'publish';
+                    }
+                    $postData['post_title'] = $gallery->title;
+                    $postData['post_type'] = $post_type;
+                    $postData['tags_input'] = $gallery->keywords;
+                    //if we have an existing post, set the ID and update updated time
+                    if (($existingId = $this->getExistingPostId('_dc_content_id', $gallery->contentId)) !== false) {
+                        $postData['ID'] = $existingId;
                     }
 
-                    if($feature_image) {
-                        set_post_thumbnail($postId, $attach_id);
-                    }
+                    kses_remove_filters();
+                    $postId = wp_insert_post($postData, $error);
 
-                    $feature_image = false;
                 }
+
+                // attach the file to the post
+                $attach_id = wp_insert_attachment( $attachment, $finalLocation, $postId );
+
+                // you must first include the image.php file
+                // for the function wp_generate_attachment_metadata() to work
+                require_once(ABSPATH . 'wp-admin/includes/image.php');
+                $attach_data = wp_generate_attachment_metadata( $attach_id, $finalLocation );
+                wp_update_attachment_metadata( $attach_id, $attach_data );
+
+                $metaPrefix = '_dc_';
+                $metaFields = array(
+                    'photo_id'   => $photo->id,
+                );
+
+                foreach($metaFields as $key => $value){
+                    add_post_meta($attach_id, $metaPrefix . $key, $value, true);
+                }
+
+                if($feature_image) {
+                    set_post_thumbnail($postId, $attach_id);
+                }
+
+                $feature_image = false;
             }
+        }
+    }
+
+    /**
+     * @param string $summary
+     * @param mixed  $data
+     * @param string $level
+     */
+    public function logToDC($summary, $data, $level = 'info') {
+        if(!$this->enableLogging) {
+            return;
+        }
+        $ch = curl_init();
+        $data = array(
+            "messages" => array(
+                json_encode(
+                    array(
+                        'msgType' => 'dc-wp-test',
+                        'summary' => $summary,
+                        'data' => $data,
+                        'apiKey' => $this->apiKey,
+                        'status' => 'test',
+                        'clientName' => 'DC',
+                        'level' => $level,
+                        'timestamp' => round(microtime(true) * 1000)
+                    )
+                )
+            )
+        );
+        curl_setopt($ch, CURLOPT_URL, 'https://www.deseretconnect.com/dash/clientlog');
+        curl_setopt($ch, CURLOPT_POST, 1);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
+        curl_setopt($ch, CURLOPT_HTTPHEADER, array ("Accept: application/json", "Content-Type: application/json"));
+        curl_exec($ch);
+        curl_close($ch);
     }
 }
